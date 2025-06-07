@@ -37,6 +37,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'adminDashboard'])->name('dashboard');
         Route::resource('exams', ExamController::class);
+        
+        // Question routes
+        Route::get('/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
+        Route::get('/questions/{question}/data', [QuestionController::class, 'getData'])->name('questions.data');
         Route::post('/exams/{exam}/questions', [QuestionController::class, 'store'])->name('questions.store');
         Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
         Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');

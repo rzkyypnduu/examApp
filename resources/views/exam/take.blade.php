@@ -9,7 +9,8 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4>{{ $exam->title }}</h4>
                 <div id="timer" class="badge bg-warning fs-6">
-                    <i class="fas fa-clock"></i> <span id="timeRemaining">{{ $userExam->getRemainingTime() }}:00</span>
+                    <i class="fas fa-clock"></i> 
+                    <span id="timeRemaining">00:00</span>
                 </div>
             </div>
             <div class="card-body">
@@ -84,7 +85,8 @@
                             <button type="button" 
                                     class="btn btn-outline-primary btn-sm w-100 question-nav" 
                                     data-question="{{ $question->id }}"
-                                    onclick="scrollToQuestion({{ $question->id }})">
+                                    onclick="scrollToQuestion({{ $question->id }})"
+                                    id="nav-btn-{{ $question->id }}">
                                 {{ $index + 1 }}
                             </button>
                         </div>
@@ -108,7 +110,7 @@
     </div>
 </div>
 
-<!-- Submit Confirmation Modal -->
+<!-- Submit Modal -->
 <div class="modal fade" id="submitModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -134,29 +136,27 @@
 
 @section('scripts')
 <script>
-let timeRemaining = {{ $userExam->getRemainingTime() * 60 }}; // Convert to seconds
+const EXAM_KEY = 'exam_timer_{{ $userExam->id }}';
+let savedTime = localStorage.getItem(EXAM_KEY);
+let timeRemaining = savedTime ? parseInt(savedTime) : Math.floor({{ $userExam->getRemainingTime() * 60 }});
 
-// Timer functionality
 function updateTimer() {
-    const minutes = Math.floor(timeRemaining / 60);
-    const seconds = timeRemaining % 60;
-    
-    document.getElementById('timeRemaining').textContent = 
-        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    
     if (timeRemaining <= 0) {
         alert('Time is up! Your exam will be submitted automatically.');
         document.querySelector('#submitModal form').submit();
         return;
     }
+
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    document.getElementById('timeRemaining').textContent = 
+        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     
     timeRemaining--;
+    localStorage.setItem(EXAM_KEY, timeRemaining);
 }
-
-// Start timer
 setInterval(updateTimer, 1000);
 
-// Save answer function
 function saveAnswer(questionId, answer) {
     fetch(`{{ route('exam.answer', $exam) }}`, {
         method: 'POST',
@@ -172,11 +172,9 @@ function saveAnswer(questionId, answer) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Mark question as answered
-            const navButton = document.querySelector(`[data-question="${questionId}"]`);
+            const navButton = document.querySelector(`#nav-btn-${questionId}`);
             navButton.classList.remove('btn-outline-primary');
             navButton.classList.add('btn-success');
-            
             updateAnsweredCount();
         }
     })
@@ -185,40 +183,35 @@ function saveAnswer(questionId, answer) {
     });
 }
 
-// Scroll to question
 function scrollToQuestion(questionId) {
     const questionElement = document.querySelector(`[data-question="${questionId}"]`);
     questionElement.scrollIntoView({ behavior: 'smooth' });
 }
 
-// Submit exam
 function submitExam() {
     updateAnsweredCount();
     const modal = new bootstrap.Modal(document.getElementById('submitModal'));
     modal.show();
 }
 
-// Update answered count
 function updateAnsweredCount() {
     const answeredButtons = document.querySelectorAll('.question-nav.btn-success');
     document.getElementById('answeredCount').textContent = answeredButtons.length;
 }
 
-// Initialize answered count on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Mark already answered questions
     @foreach($questions as $question)
         @if($question->userAnswers->first())
-            const navButton{{ $question->id }} = document.querySelector(`[data-question="{{ $question->id }}"]`);
-            navButton{{ $question->id }}.classList.remove('btn-outline-primary');
-            navButton{{ $question->id }}.classList.add('btn-success');
+            const navButton = document.querySelector(`#nav-btn-{{ $question->id }}`);
+            if (navButton) {
+                navButton.classList.remove('btn-outline-primary');
+                navButton.classList.add('btn-success');
+            }
         @endif
     @endforeach
-    
     updateAnsweredCount();
 });
 
-// Prevent accidental page refresh
 window.addEventListener('beforeunload', function(e) {
     e.preventDefault();
     e.returnValue = '';

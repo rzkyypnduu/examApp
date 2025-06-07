@@ -5,6 +5,7 @@
 @section('content')
 <div class="row">
     <div class="col-md-8">
+        <!-- Exam Details -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4><i class="fas fa-clipboard-list"></i> {{ $exam->title }}</h4>
@@ -218,18 +219,15 @@
                     <div id="optionsSection" style="display: none;">
                         <label class="form-label">Options</label>
                         <div id="optionsList">
+                            <!-- Initial Option Fields -->
+                            @for($i = 1; $i <= 2; $i++)
                             <div class="input-group mb-2">
-                                <input type="text" class="form-control" name="options[]" placeholder="Option 1">
+                                <input type="text" class="form-control" name="options[]" placeholder="Option {{ $i }}">
                                 <button type="button" class="btn btn-outline-danger" onclick="removeOption(this)">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
-                            <div class="input-group mb-2">
-                                <input type="text" class="form-control" name="options[]" placeholder="Option 2">
-                                <button type="button" class="btn btn-outline-danger" onclick="removeOption(this)">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+                            @endfor
                         </div>
                         <button type="button" class="btn btn-outline-primary btn-sm" onclick="addOption()">
                             <i class="fas fa-plus"></i> Add Option
@@ -255,7 +253,6 @@
         </div>
     </div>
 </div>
-
 @endsection
 
 @section('scripts')
@@ -263,18 +260,13 @@
 function toggleOptions() {
     const questionType = document.getElementById('question_type').value;
     const optionsSection = document.getElementById('optionsSection');
-    
-    if (questionType === 'multiple_choice') {
-        optionsSection.style.display = 'block';
-    } else {
-        optionsSection.style.display = 'none';
-    }
+    optionsSection.style.display = (questionType === 'multiple_choice') ? 'block' : 'none';
 }
 
 function addOption() {
     const optionsList = document.getElementById('optionsList');
     const optionCount = optionsList.children.length + 1;
-    
+
     const optionDiv = document.createElement('div');
     optionDiv.className = 'input-group mb-2';
     optionDiv.innerHTML = `
@@ -283,12 +275,131 @@ function addOption() {
             <i class="fas fa-trash"></i>
         </button>
     `;
-    
     optionsList.appendChild(optionDiv);
 }
 
 function removeOption(button) {
     button.parentElement.remove();
+}
+
+function editQuestion(questionId) {
+    // Show loading state
+     window.location.href = `/admin/questions/${questionId}/edit`;
+    console.log('Loading question data for ID:', questionId);
+    
+    fetch(`/admin/questions/${questionId}/data`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Question data received:', data);
+            
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to load question data');
+            }
+            
+            // Populate form fields
+            document.getElementById('edit_question_text').value = data.question_text || '';
+            document.getElementById('edit_question_type').value = data.question_type || '';
+            document.getElementById('edit_correct_answer').value = data.correct_answer || '';
+            document.getElementById('edit_points').value = data.points || 1;
+            
+            // Set form action
+            const form = document.getElementById('editQuestionForm');
+            if (form) {
+                form.action = `/admin/questions/${questionId}`;
+            }
+
+            // Handle options
+            const editOptionsList = document.getElementById('editOptionsList');
+            if (editOptionsList) {
+                editOptionsList.innerHTML = '';
+
+                if (data.question_type === 'multiple_choice' && data.options && Array.isArray(data.options)) {
+                    data.options.forEach((option, index) => {
+                        const optionDiv = document.createElement('div');
+                        optionDiv.className = 'input-group mb-2';
+                        optionDiv.innerHTML = `
+                            <input type="text" class="form-control" name="options[]" 
+                                   value="${escapeHtml(option)}" placeholder="Option ${index + 1}">
+                            <button type="button" class="btn btn-outline-danger" onclick="removeEditOption(this)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        `;
+                        editOptionsList.appendChild(optionDiv);
+                    });
+                }
+            }
+
+            // Toggle options visibility
+            if (typeof toggleEditOptions === 'function') {
+                toggleEditOptions();
+            }
+
+            // Show modal
+            const modalElement = document.getElementById('editQuestionModal');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            } else {
+                console.error('Edit modal not found');
+                alert('Edit modal not found. Please refresh the page.');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching question data:', error);
+            alert('Error loading question data: ' + error.message);
+        });
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Function to toggle edit options visibility
+function toggleEditOptions() {
+    const questionType = document.getElementById('edit_question_type')?.value;
+    const optionsSection = document.getElementById('editOptionsSection');
+    
+    if (optionsSection) {
+        if (questionType === 'multiple_choice') {
+            optionsSection.style.display = 'block';
+        } else {
+            optionsSection.style.display = 'none';
+        }
+    }
+}
+
+// Function to remove edit option
+function removeEditOption(button) {
+    if (button && button.parentElement) {
+        button.parentElement.remove();
+    }
+}
+
+// Function to add edit option
+function addEditOption() {
+    const optionsList = document.getElementById('editOptionsList');
+    if (!optionsList) return;
+    
+    const optionCount = optionsList.children.length + 1;
+    
+    const optionDiv = document.createElement('div');
+    optionDiv.className = 'input-group mb-2';
+    optionDiv.innerHTML = `
+        <input type="text" class="form-control" name="options[]" placeholder="Option ${optionCount}">
+        <button type="button" class="btn btn-outline-danger" onclick="removeEditOption(this)">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    
+    optionsList.appendChild(optionDiv);
 }
 </script>
 @endsection
